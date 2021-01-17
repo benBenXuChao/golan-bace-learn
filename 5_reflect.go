@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2021-01-05 16:59:23
- * @LastEditTime: 2021-01-07 19:40:43
+ * @LastEditTime: 2021-01-17 19:05:19
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: /demo/5_reflect.go
@@ -73,10 +73,14 @@ func updateVal(arg any) {
 	v := reflect.ValueOf(arg)
 	k := v.Elem().Kind()
 	fmt.Println(k)
+
 	switch k {
 	case reflect.Float32:
 	case reflect.Float64:
 		v.Elem().SetFloat(100.21)
+		tp := v.Elem().Type().Name()
+		fmt.Printf("v的类型: %s\n", tp)
+
 	case reflect.String:
 		v.Elem().SetString("liliya")
 	case reflect.Int:
@@ -215,7 +219,11 @@ func ReadConfig(path string, cner interface{}) error {
 	}
 	return nil
 }
-func initqws() {
+func getNames(n interface{}) {
+	v := reflect.ValueOf(n)
+	fmt.Printf("name-elem: %s\n", v.Elem().Type().Name())
+}
+func initloi() {
 	num1 := aliInt(1)
 	num2 := mInt(2)
 	bl := true
@@ -281,5 +289,4 @@ func initqws() {
 	var config = conf{}
 	ReadConfig("config.ini", &config)
 	fmt.Printf("config: %v\n", config)
-
 }

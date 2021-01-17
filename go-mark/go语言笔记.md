@@ -1405,7 +1405,7 @@ make(map[KeyType]ValueType, [cap])
    - 类型信息：预先定义好的元信息
    - 值信息：程序运行过程中可动态变化的
 
-3. 任何接口值都是由 `具体类型` 和`具体类型的值`两部分组成的，reflect包提供了 `reflect.TypeOf()` 和`reflect.ValueOf()`两个函数来获取任意对象的Value和Type
+3. 任何接口值都是由 `具体类型` 和`具体类型的值`两部分组成的，reflect包提供了 `reflect.TypeOf() reflect.Type` 和`reflect.ValueOf() reflect.Value`两个函数来获取任意对象的Value和Type
 
 4.  `reflect.TypeOf()` 方法获取接口值的类型
 
@@ -1420,7 +1420,7 @@ make(map[KeyType]ValueType, [cap])
    - 在reflect包中定义的Kind类型如下
 
      ```go
-     type Kind uint
+     type Kind uint // reflect.Kind 类型
      const (
          Bool                 // 布尔型
          Int                  // 有符号整型
@@ -1448,10 +1448,610 @@ make(map[KeyType]ValueType, [cap])
 
      
 
-5. 常用到的反射
+5. 反射TypeOf中的方法
+
+   1. 获取该变量的类型：`Name() string`
+
+   2. 获取该变量的大类：`Kind() reflect.Kind`
+
+   3. 如果变量类型为struct结构体，则有一下方法
+
+      1. 根据索引获取结构体字段的信息
+
+         `Field(i int) StructField`
+
+      2. 当结构体是多层时，通过索引获取结构体字段信息
+
+         `FieldByIndex(index []int) StructField`
+
+      3. 根据字段名获取结构体字段信息
+
+         `FiledByName(name string)(StructField, bool)`
+
+      4. 获取结构体成员字段数量
+
+         `NumField() int`
+
+      5. 根据索引获取结构体成员方法
+
+         `Method(i int) Method`
+
+      6. 根据方法名获取结构体成员方法
+
+         `MethodByName(name string) (Method, bool)`
+
+      7. 获取该结构体方法的数量
+
+         `NumMethod() int`
+
+      8. 当你只知道值不知道字段叫什么名，可以使用匹配函数（如获取所有int类型的字段）
+
+         `FieldByNameFunc(match func(string) bool)(StructField, bool)`
+
+   4. 上面结构体方法返回的StructField包含信息
+
+      ```go
+      type StructField struct {
+          // Name是字段的名字。PkgPath是非导出字段的包路径，对导出字段该字段为""。
+          // 参见http://golang.org/ref/spec#Uniqueness_of_identifiers
+          Name    string
+          PkgPath string
+          Type      Type      // 字段的类型
+          Tag       StructTag // 字段的标签
+          Offset    uintptr   // 字段在结构体中的字节偏移量
+          Index     []int     // 用于Type.FieldByIndex时的索引切片
+          Anonymous bool      // 是否匿名字段
+      }
+      ```
+
+   5. 获取Tag：
+
+      `structField.Tag.Get(name string) string`
+
+   6. 一般先获取结构体成员数量，然后遍历每个字段
+
+      ```go
+      stu1 := student{
+      		Name:  "小王子",
+      		Score: 90,
+      	}
+      
+      	t := reflect.TypeOf(stu1)
+      	fmt.Println(t.Name(), t.Kind()) // 可以判断Kind是否是Struct类型
+      	// 通过for循环遍历结构体的所有字段信息
+      	for i := 0; i < t.NumField(); i++ {
+      		field := t.Field(i)
+      		fmt.Printf("name:%s index:%d type:%v json tag:%v\n", field.Name, 		           field.Index, field.Type, field.Tag.Get("json"))
+      	}
+      
+      ```
+
+      
+
+6. 反射ValueOf的方法
+
+   1. 获取该变量的大类：`Kind() reflect.Kind`
+
+   2. 获取该变量的Type：`Type() reflect.Type`
+
+   3. 判断这个值是否合法：`IsValid() bool`，如果变量是Value零值，则会返回假，此时v除了IsValue、String、Kind之外的方法都会报panic，所以最好在使用v方法之前进行IsValid判断
+
+   4. 判断v持有的值是否为nil：`IsNil() bool`，v持有值的分类必须是通道、切片、映射、指针、函数、接口之一，否则IsNilH函数就会报错
+
+   5. 如果该变量是一个结构体则有一下方法
+
+      1. 根据索引获取结构体字段值
+
+         `Field(i int) Value`
+
+      2. 如果是多层结构体，根据索引获取结构体值
+
+         `FieldByIndex(index []int) Value`  <!--下面的类似TypeOf，只是返回值改为Value-->
+
+      3. 根据名字获取结构体字段值
+
+      4. 获取结构体成员数量
+
+      5. 根据索引获取结构体成员方法
+
+      6. 根据名字获取结构体成员方法
+
+      7. 获取该结构体方法数量
+
+      8. 根据条件匹配结构体字段
+      
+   6. 通过反射获取值
+
+      ```go
+      // GetValue 获取原始值
+      func GetValue(arg any) (val any) {
+      	v := reflect.ValueOf(arg)
+      	k := v.Kind()
+      
+      	switch k {
+      	case reflect.Float32:
+      		val = float32(v.Float())
+      	case reflect.Float64:
+      		val = v.Float()
+      	case reflect.String:
+      		val = v.String()
+      	case reflect.Int:
+              // v.Int()从反射中获取整型的原始值int64，然后通过int()强制类型转换
+      		val = int(v.Int())
+      	case reflect.Int32:
+              // v.Int()从反射中获取整型的原始值int64，然后通过int32()强制类型转换
+      		val = int32(v.Int())
+      	case reflect.Bool:
+      		val = v.Bool()
+      	}
+      	fmt.Printf("val: %v, kind: %v\n", val, k)
+      
+      	return
+      }
+      GetValue(10)
+      GetValue("start")
+      GetValue(12.54)
+      ```
+
+      
+
+   7. 通过反射设置值
+
+      ```go
+      // 修改值
+      func updateVal(arg any) {
+      	// old := *arg.(prt)
+      	v := reflect.ValueOf(arg)
+      	k := v.Elem().Kind()
+      	fmt.Println(k)
+      	switch k {
+      	case reflect.Float32:
+      	case reflect.Float64:
+      		v.Elem().SetFloat(100.21)
+              tp := v.Elem().Type().Name() // v如何获取小类
+      		fmt.Printf("v的类型: %s\n", tp) // 设置持有值并不会改变变量原有的类型
+      	case reflect.String:
+      		v.Elem().SetString("liliya")
+      	case reflect.Int:
+      	case reflect.Int32:
+      		v.Elem().SetInt(121)
+      	case reflect.Bool:
+      		v.Elem().SetBool(false)
+      	}
+      }
+      updateVal(10)
+      updateVal(19.01)
+      updateVal(true)
+      ```
+
+      
+
+   8. reflect.Value 类型即v，提供了哪些获取和设置原始值的方法
+
+      1. 获取原始值（持有值）
+
+         1. 以int类型返回，包含（int、int8、int16、int32、int64）
+
+            `v.Int() int64`
+
+         2. 以Uint类型返回，包含（与上面相似）
+
+            `v.Uint() uint64`
+
+         3. 以Float类型返回，包含（float32、float64）
+
+            `v.Float() float64`
+
+         4. 以Bool类型返回
+
+            `v.Bool() bool`
+
+         5. 以字节数组[]byte类型返回
+
+            `v.Bytes() []byte`
+
+         6. 以字符串类型返回
+
+            `v.String() string`
+
+         7. 获取持有值的长度，如果持有值不是Slice、Map、Array、Chan、String则会panic
+
+            `v.Len() int`
+
+      2. 设置原始值（持有值），设置之后并不影响变量原有的类型，重点：一定要使用`v.Elem() Value`不然设置不生效
+
+         1. 将持有值设置为int
+
+            `v.SetInt(x int64)`
+
+         2. 将持有值设置为unit
+
+            `v.SetInt(x uint64)`
+
+         3. 将持有值设置为float
+
+            `v.SetFloat(x float64)`
+
+         4. 将持有值设置为bool
+
+            `v.SetBool(x bool)`
+
+         5. 将持有值设置为字节数组[]byte
+
+            `v.SetBytes(x []byte)`
+
+         6. 将持有值设置为string
+
+            `v.SetString(x string)`
+
+         7. 设置持有值的长度，如果v的Kind不是Slice或者（超出容量），将panic
+
+            `v.SetLen(x int)`
+
+7. 常用到的反射
 
    1. json数据的解析
    2. orm数据的解析
    3. 配置文件的解析
+
+#### 文件操作
+
+1. 打开文件
+
+   1. 使用os包的`os.Open(name string)(file *File, err error)`方法
+
+   2. os包简介：os包提供了操作系统函数的不依赖平台的接口，可以对文件进行操作
+
+      ```go
+      	// Open(name string) (file *os.File, err error) *os.File是一个结构体，下面的			os.Reader是一个接口，os.File实现了这个接口
+      	file, err := os.Open(path) // path是文件的路径
+      	// 当err为nil时，文件打开失败 open file.go: no such file or directory
+      	if err != nil { 
+      		return
+      	}
+      	defer file.Close() // 在程序退出是要及时关闭文件
+      ```
+
+      
+
+2. 读取文件
+
+   1. 通过os包的`file.Read(b []byte)(n int, err error)`，n表示写入b的字节数
+
+      ```go
+      	// 如果已经知道文件的字节数，可以设置一个固定容量的切片（file是上面打开的文件）
+      	var bts = make([]byte, 255)
+      	num, err := file.Read(bts)
+      	if err == io.EOF { // 如果错误是io.EOF则证明文件读取完毕
+      		fmt.Println("文件读完了")
+      		return
+      	}
+      	if err != nil {
+      		fmt.Println("read file failed, err:", err)
+      		return
+      	}
+      	fmt.Printf("读取了: %d个字节\n", num)
+      	fmt.Println(string(bts[:num]))
+      
+      	// 如果不知道文件有多少内容，则需要循环来读取
+      	var reads = []byte{}
+      	// 128 当比较小时，会出现乱码的情况，但也不能设置无限大
+      	for sl := make([]byte, 128); ; { 
+      		n, err := file.Read(sl)
+      		if err == io.EOF {
+      			fmt.Println("文件读完了")
+      			break
+      		}
+      		if err != nil {
+      			return err
+      		}
+      		reads = append(reads, sl[:n]...) // 使用append扩容
+      		fmt.Println(string(reads), ";")
+      	}
+      ```
+
+      2. 充值定位置读取`ReadAt(b []byte, off int64) (n int, err error)`
+
+   2. 通过bufio包来读取文件（bufio包实现了有缓冲的I/O，是在file的基础上又封装了一层）
+
+      ```go
+      	file, err := os.Open(path)
+      	if err != nil {
+      		return err
+      	}
+      	defer file.Close()
+      	// 创建一个具有默认大小缓冲、从r读取的*Reader。 NewReader(rd io.Reader) *Reader 
+      	buf := bufio.NewReader(file)
+      	var strs = []string{}
+      	for {
+              // ReadString(delim byte) (line string, err error) 
+              st, err := buf.ReadString('\n') // 以换行符(delim)来读取文件，一行返回一个字符串
+      		if err == io.EOF {
+      			fmt.Println("over")
+      			break
+      		}
+      		a := []rune(st)
+      		a = append(a[:len(a)-1], ';', a[len(a)-1])
+      		strs = append(strs, string(a))
+      	}
+      	fmt.Printf("最后的数组: %v\n", strs)
+      	return nil
+      
+      	// 该包其他读取方法
+      	Read(p []byte) (n int, err error) // 与file.Read()类似
+      	ReadSlice(delim byte) (line []byte, err error) // 以切片为delim读取，即可以通过多个
+      	// ReadBytes 功能同 ReadSlice，只不过返回的是缓存的拷贝。
+      	ReadBytes(delim byte) (line []byte, err error) 
+      	// 创建并返回一个从r读取数据的Scanner; NewScanner(r io.Reader) *Scanner
+      	bufio.NewScanner(file)
+      	// Split设置该Scanner的分割函数 
+      	// type SplitFunc func(data []byte, atEOF bool) (advance int, token []byte, err 	error)
+      	Split(split SplitFunc)	
+      ```
+
+      
+
+   3. 使用ioutil包读取文件（一个辅助的工具包就是ioutil）
+
+      ```go
+      	// ReadFile(filename string) ([]byte, error) 
+      	str, err := ioutil.ReadFile(path)
+      	if err != nil { // 需要注意，其他两种读取文件是判断err是否为io.EOF，这个是判断是否为nil
+      		return err
+      	}
+      	fmt.Printf("文件读取到:\n %s\n", string(str))
+      
+      	// 该包的其他读取方式
+      	ReadAll(r io.Reader)(b []byte, err error) // r读取数据直到EOF或遇到error
+      ```
+
+      
+
+3. 写入文件
+
+   1. 使用os包写入文件
+
+      ```go
+      	// OpenFile(name string, flag int, perm FileMode) (file *File, err error)
+      	// flag 指定的选项，下面表示，判定能不能写入，不能写入（表示原本就有内容，或文件不存在）清空，不能清空（表示文件不存在）就创建。 os.O_TRUNC可以为O_APPEND
+      	// perm 指定的模式
+      	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
+      	if err != nil {
+      		return err
+      	}
+      	_, noOK := file.Write(by)
+      	// file.WriteString("你好呀")
+      	if noOK != nil {
+      		return noOK
+      	}
+      	return nil
+      
+      	// 文件的其他flag
+      	const (
+              O_RDONLY int = syscall.O_RDONLY // 只读模式打开文件
+              O_WRONLY int = syscall.O_WRONLY // 只写模式打开文件
+              O_RDWR   int = syscall.O_RDWR   // 读写模式打开文件
+              O_APPEND int = syscall.O_APPEND // 写操作时将数据附加到文件尾部
+              O_CREATE int = syscall.O_CREAT  // 如果不存在将创建一个新文件
+              O_EXCL   int = syscall.O_EXCL   // 和O_CREATE配合使用，文件必须不存在
+              O_SYNC   int = syscall.O_SYNC   // 打开文件用于同步I/O
+              O_TRUNC  int = syscall.O_TRUNC  // 如果可能，打开时清空文件
+      	)
+      ```
+
+      
+
+   2. 使用bufio包写入文件
+
+      ```go
+      	// NewWriter(w io.Writer) *Writer  Writer也是一个接口，os.File也实现了Writer
+      	bfo := bufio.NewWriter(file) // file是os.OpenFile打开的文件
+      	arr := strings.Split([]string{"你好\n我在这\n哈哈哈\n"}, "\n")
+      	for _, v := range arr {
+              // WriteString(w Writer, s string) (n int, err error)
+      		bfo.WriteString(v)
+      	}
+      	bfo.Flush() // 缓存区保存
+      	return nil
+      ```
+
+      
+
+   3. 使用ioutil包写入文件
+
+      ```go
+      // iotuil实现文件写入
+      func ioWrite(path string, con string) error {
+          // WriteFile(filename string, data []byte, perm os.FileMode) error
+      	err := ioutil.WriteFile(path, []byte(con), 0666)
+      	if err != nil {
+      		return err
+      	}
+      	return nil
+      }
+      ```
+
+      
+
+4. 使用io包copy文件`io.Copy()`
+
+   ```go
+   // 实现文件copy
+   func copyFile(opath string, cpath string) error {
+   	ofile, err := os.Open(opath)
+   	if err != nil {
+   		return err
+   	}
+   	defer ofile.Close()
+   	cfile, err := os.OpenFile(cpath, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+   	if err != nil {
+   		return err
+   	}
+   	io.Copy(cfile, ofile)
+   	return nil
+   }
+   ```
+
+
+
+#### 并发goroutine
+
+1. 并发的解释
+
+   并发：同一时间段内执行多个任务（你在用微信和两个女朋友聊天）。
+
+   Go语言的并发是通过`gotoutine`来实现的，`goroutine`类似于线程，属于用户态的线程，我们可以根据需要创建成千上万个`goroutine`并发工作
+
+   与线程的区别：线程是由操作系统调度完成的，而`goroutine`则是由Go语言的运行时（runtime）调度完成
+
+   Go的智能之处：Go程序会将`gotoutine`的任务合理的分配给每个CPU，会优先的跑满整个CPU，充分利用每一个内核。而且Go语言已经内置了调度和上下文切换机制，不需要java和c++那样自己维护
+
+2. 使用`goroutine`
+
+   使用`goroutine`只需要在调用的函数前加上go关键字
+
+   一个`goroutine`必定对应一个函数，可以创建多个`goroutine`去执行相同的函数
+
+   ```go
+   func hello() {
+   	fmt.Println("Hello Goroutine!")
+   }
+   func main() {
+   	go hello() // hello内部的逻辑和下面的逻辑同时进行
+       // 但是并没有打印Hello Goroutine!
+   	fmt.Println("main goroutine done!")
+   }
+   ```
+
+   
+
+3. 为什么不打印Hello Goroutine!
+
+   在程序启动时，Go程序就会为`main()`函数创建一个默认的`goroutine`。
+
+   当main()函数返回的时候该`goroutine`就结束了。
+
+   所有在`main()`函数中启动的`goroutine`会一同结束。
+
+   因为main开启一个`goroutine`花费的时间要比执行打印main goroutine done!长，所以还没执行hello函数时，main就结束了，main内开启的`goroutine`也会结束
+
+4. 如何解决
+
+   只需要让main内的程序等一下hello执行完就可以了
+
+   ```go
+   func main() {
+   	go hello()
+   	fmt.Println("main goroutine done!")
+       time.Sleep(time.Second) // 等一秒，hello就能执行完
+   }
+   ```
+
+   
+
+5. 傻等1秒很不合理，如何让主程序main等所有的`goroutine`都执行完，再结束进程
+
+   ```go
+   var wg sync.WaitGroup
+   
+   func hello(i int) {
+   	defer wg.Done() // goroutine结束就登记-1
+   	fmt.Println("Hello Goroutine!", i)
+   }
+   func main() {
+       // wg.Add(10) 也可以这么写
+   	for i := 0; i < 10; i++ {
+   		wg.Add(1) // 启动一个goroutine就登记+1
+           // 启动多个goroutine，这些goroutine是竞争关系，调度是随机的。即不一定谁前谁后执行。
+   		go hello(i) 
+   	}
+   	wg.Wait() // 等待所有登记的goroutine都结束
+   }
+   ```
+
+   
+
+6. 可增长的栈
+
+   os线程一般都有固定的栈内存（通常为2MB），而一个`goroutine`的栈最初是很小的（典型情况下2KB），但她可以按照需求增大和缩小，她最大可以达到1GB
+
+#### 管道channel
+
+1. 什么是管道
+
+   管道是`goroutine`之间的通信手段，channel是`goroutine`之间的连接，`channel`是可以让一个`goroutine`发送特定的值到另一个`goroutine`的通信机制
+
+2. 为什么要用管道
+
+   单纯地将函数并发执行是没有意义的。函数与函数间需要交换数据才能体现并发执行函数的意义。
+
+   虽然可以使用共享内存进行数据交换，但是共享内存在不同的`goroutine`中容易发生竞态问题。为了保证数据交换的正确性，必须使用互斥量对内存进行加锁，这种做法势必造成性能问题。
+
+   Go语言的并发模型是<font color="#dd0000">**通过通信共享内存**</font>而不是<font color="#dd0000">**通过共享内存而实现通信**</font>
+
+3. channel的实质
+
+   `channel`是一种类型，一种引用类型。声明通道类型的格式如下
+
+   ```go
+   var ch1 chan int   // 声明一个传递整型的通道
+   var ch2 chan bool  // 声明一个传递布尔型的通道
+   var ch3 chan []int // 声明一个传递int切片的通道
+   ```
+
+   
+
+4. channel是引用类型所以需要make初始化
+
+   ```go
+   ch := make(chan int)
+   ```
+
+5. channel的操作有哪些
+
+   通道有**发送**（send）、**接收**(receive）和**关闭**（close）三种操作。
+
+   发送和接收都使用`<-`符号。
+
+   1. 发送
+
+      ```go
+      ch <- 10 // 把10发送到ch中
+      ```
+
+   2. 接受
+
+      ```go
+      x := <- ch // 从ch中接收值并赋值给变量x
+      <-ch       // 从ch中接收值，忽略结果
+      ```
+
+   3. 关闭
+
+      ```go
+      close(ch) // 关闭
+      ```
+      1. 对一个关闭的通道再发送值就会导致panic。
+      2. 对一个关闭的通道进行接收会一直获取值直到通道为空。
+      3. 对一个关闭的并且没有值的通道执行接收操作会得到对应类型的零值。
+      4. 关闭一个已经关闭的通道会导致panic。
+
+6. 无缓冲channel
+
+   
+
+   
+
+   
+
+   
+
+   
+
+
+
+
+
+
 
 
