@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2020-12-04 10:09:38
- * @LastEditTime: 2021-01-05 14:11:57
+ * @LastEditTime: 2021-01-21 17:24:48
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: /demo/main.go
@@ -9,6 +9,7 @@
 package main
 
 import (
+	_ "pkg.deepin.com/web/service/demo/server"
 	_ "pkg.deepin.com/web/service/demo/snow"
 )
 

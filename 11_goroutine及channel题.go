@@ -1,8 +1,8 @@
 /*
  * @Author: your name
  * @Date: 2021-01-16 21:42:50
- * @LastEditTime: 2021-01-17 15:10:15
- * @LastEditors: your name
+ * @LastEditTime: 2021-01-21 17:56:58
+ * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: /demo/11_goroutine及channel题.go
  */
@@ -70,6 +70,7 @@ func ranCountMain() {
 	}
 	// ranWait.Wait()
 }
-func initsds() {
+func initrsd() {
 	ranCountMain()
+
 }

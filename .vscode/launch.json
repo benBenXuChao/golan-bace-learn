@@ -8,10 +8,14 @@
             "name": "Launch",
             "type": "go",
             "request": "launch",
-            "mode": "auto",
+            "mode": "debug",
             "program": "${fileDirname}",
             "env": {},
-            "args": []
+            "args": [
+                "mod",
+                "vendor"
+            ],
+            "cwd": "./../"
         }
     ]
 }
